@@ -16,23 +16,24 @@ def plot(suffix, df, xheader, yheader, xscale, yscale, locations, kwarg={}):
 
     for location in locations:
         if xheader == 'date':
-            ys = df[df['location'] == location][yheader].squeeze()
+            ys = df.loc[location].filter([yheader]).squeeze()
             # the first time we reset the indices, we reset the counter. We use
             # the second time to create our x series.
             series = ys[ys != 0].rolling(window=7).mean().reset_index(drop=True) \
-                       .reset_index() \
-                       .rename(columns={'index': 'x', yheader: 'y'}) \
-                       .dropna()
+                       .dropna() \
+                       .squeeze()
         else:
-            series = df[df['location'] == location] \
+            series = df.loc[location] \
                     .filter(items=[xheader, yheader]) \
                     .rolling(window=7, on=xheader).mean() \
-                    .rename(columns={xheader: 'x', yheader: 'y'}) \
-                    .dropna()
+                    .set_index([xheader], drop=True) \
+                    .dropna() \
+                    .squeeze()
 
         if not series.size == 0:
-            ax.plot(series['x'], series['y'], **kwarg)
-            ax.annotate(location, series.iloc[-1, :], fontsize=8)
+            ax.plot(series.index, series.values, **kwarg)
+            *_, last = series.items()
+            ax.annotate(location, last, fontsize=8)
 
     if xheader == 'date':
         xlabel = 'time since first infection (days)'.title()
@@ -77,19 +78,21 @@ if __name__ == '__main__':
                  'New Zealand', 'Canada', 'Mexico', 'Italy']
 
     worldwide_data = retrieve_owid_dataset()
-    worldwide_data.rename(columns={'total_cases': 'running total'},
+    worldwide_data.rename(columns={'total_cases': 'running total',
+                                   'new_cases': 'daily_new_cases'},
                                    inplace=True)
+    worldwide_data.set_index(['location', 'date'], inplace=True)
 
     plot('by country', worldwide_data,
          'date', 'running total', 'linear', 'log', countries,
          kwarg={'linestyle': ':', 'linewidth': 0.5})
 
     plot('by country', worldwide_data,
-         'running total', 'new_cases', 'log', 'log', countries,
+         'running total', 'daily_new_cases', 'log', 'log', countries,
          kwarg={'linewidth': 0, 'marker': 'o', 'markersize': 1})
 
     plot('by country', worldwide_data,
-         'new_tests', 'new_cases', 'log', 'log', countries,
+         'new_tests', 'daily_new_cases', 'log', 'log', countries,
          kwarg={'linewidth': 0, 'marker': 'o', 'markersize': 1})
 
     plot('by country', worldwide_data,
@@ -110,22 +113,19 @@ if __name__ == '__main__':
 
     data_by_state = []
     for state in states:
-        df = us_data[us_data['state'] == state].sort_values(by=['date'])
-        df['new_cases'] = df['cases'].diff()
-        data_by_state.append(df)
+        df = us_data.set_index(['state', 'date']).loc[state].sort_values(by=['date'])
+        df['location'] = state
+        df['daily_new_cases'] = df['cases'].diff()
+        data_by_state.append(df.reset_index().set_index(['location', 'date'], drop=True))
 
-    us_data = pd.concat(data_by_state) \
-                .sort_values(by=['date', 'state']) \
-                .reset_index() \
-                .rename(columns={'cases': 'running total',
-                                 'state': 'location'})
+    us_data = pd.concat(data_by_state).rename(columns={'cases': 'running total'})
 
     plot('by US state', us_data,
-         'running total', 'new_cases', 'log', 'log', states,
+         'running total', 'daily_new_cases', 'log', 'log', states,
          kwarg={'linewidth': 0, 'marker': 'o', 'markersize': 1})
 
     plot('by US state', us_data,
-         'date', 'new_cases', 'linear', 'linear', states,
+         'date', 'daily_new_cases', 'linear', 'linear', states,
          kwarg={'linestyle': ':', 'linewidth': 1})
 
     plot('by US state', us_data,
