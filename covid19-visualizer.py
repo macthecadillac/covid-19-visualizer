@@ -26,8 +26,8 @@ def plot(suffix, df, xheader, yheader, xscale, yscale, locations, kwarg={}):
             series = df.loc[location] \
                     .filter(items=[xheader, yheader]) \
                     .rolling(window=7, on=xheader).mean() \
-                    .set_index([xheader], drop=True) \
                     .dropna() \
+                    .set_index([xheader], drop=True) \
                     .squeeze()
 
         if not series.size == 0:
@@ -36,7 +36,7 @@ def plot(suffix, df, xheader, yheader, xscale, yscale, locations, kwarg={}):
             ax.annotate(location, last, fontsize=8)
 
     if xheader == 'date':
-        xlabel = 'time since first infection (days)'.title()
+        xlabel = 'time since first infection (days)'
     else:
         xlabel = xheader.replace('_', ' ')
     ylabel = yheader.replace('_', ' ')
